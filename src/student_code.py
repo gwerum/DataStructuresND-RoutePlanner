@@ -1,8 +1,7 @@
 from heapq import heappop, heappush, heapify
 from math import sqrt
-import pdb
 
-class Frontier():
+class FrontierQueue():
     """docstring for Frontier"""
     def __init__(self):
         self.frontier = []
@@ -42,40 +41,45 @@ class Frontier():
 
 class RoutePlanner():
     """docstring for RoutePlanner"""
-    def __init__(self, M):
+    def __init__(self):
+        self.cities = None
+        self.neighbours = None
+
+    def import_map(self, M):
         self.cities = M.intersections
         self.neighbours = M.roads
 
     def compute_distance(self, city_A, city_B):
+        # Computes linear distance between 'city_A' and 'city_B'
         pos_A, pos_B = self.cities[city_A], self.cities[city_B]
         dist_x, dist_y = pos_A[0]-pos_B[0], pos_A[1]-pos_B[1]
         return sqrt(dist_x**2 + dist_y**2)
 
-    def estimate_step_cost(self, current_city, next_city):
-        step_cost = self.compute_distance(current_city, next_city)
-        h_residual_cost = self.compute_distance(next_city, self.target)
-        return step_cost, h_residual_cost
+    def cost_function(self, prev_path_cost, cities):
+        # Computes path costs and estimates residual cost for 'next_city'
+        step_cost = self.compute_distance(cities[0], cities[1]) # (current_city, neighbour_city)
+        path_cost = prev_path_cost + step_cost
+        residual_cost = self.compute_distance(cities[1], cities[2]) # (neighbour_city, target_city)
+        total_cost = path_cost + residual_cost # f = g + h
+        return total_cost, path_cost
 
     def compute_shortest_path(self, start_city, target_city):
         self.loop_count = 0
-        # Initialize target, explore list and frontier list
-        self.target = target_city
-        self.frontier = Frontier()
+        # Initialize explore and frontier lists
+        self.frontier = FrontierQueue()
         self.explored = [start_city]
         # Initialize loop variables
         current_city, current_path_cost, current_path = start_city, 0, [start_city]
 
-        while current_city != self.target:
-            self.print_preliminary_results(current_city, current_path, current_path_cost)
-
+        while current_city != target_city:
+            #self.print_preliminary_results(current_city, current_path, current_path_cost)
             for neighbour_city in self.neighbours[current_city]:
                 if neighbour_city not in self.explored:
-                    # Estimate total cost
-                    step_cost, residual_cost = self.estimate_step_cost(current_city, neighbour_city)
-                    path_cost = current_path_cost + step_cost
-                    total_cost = path_cost + residual_cost # f = g + h
+                    # Estimate costs
+                    cities = [current_city, neighbour_city, target_city]
+                    total_cost, path_cost = self.cost_function(current_path_cost, cities)
                     neighbour_path = current_path + [neighbour_city]
-                    # Check if neighbour already exists in frontier list
+                    # If neighbour already exists in frontier list, add new path only if cheaper
                     if self.frontier.exists(neighbour_city):
                         f_index, f_total_cost, f_path_cost, f_path = self.frontier.lookup(neighbour_city)
                         if (path_cost < f_path_cost):
@@ -87,7 +91,7 @@ class RoutePlanner():
             current_city, current_total_cost, current_path_cost, current_path = self.frontier.pop()
             self.explored.append(current_city)
 
-        return current_path_cost, current_path
+        return current_path
 
     def print_preliminary_results(self, current_city, current_path, current_cost):
         print("\n########### Loop {} ########### ".format(self.loop_count))
@@ -98,15 +102,3 @@ class RoutePlanner():
         print("\nCurrent frontier: {}".format(self.frontier))
         self.loop_count += 1
 
-def shortest_path(M,start,goal):
-    print("shortest path called")
-    print("\nMap intersections:\n {}".format(M.intersections))
-    print("\nMap roads:\n {}".format(M.roads))
-
-    route_planner = RoutePlanner(M)
-
-    print("\nCompute shortest path from {} to {}".format(start, goal))
-
-    cost, shortest_path = route_planner.compute_shortest_path(start, goal)
-    
-    return shortest_path
